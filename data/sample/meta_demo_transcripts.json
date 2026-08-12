@@ -1,0 +1,26 @@
+[
+  {
+    "ticker": "META",
+    "date": "2025-04-30",
+    "quarter": "Q1",
+    "year": 2025,
+    "title": "Meta Q1 2025 demo transcript",
+    "transcript": "This is a short, fictional interface-preview transcript included only so the FinSight dashboard works before a licensed or permitted corpus is added. Management discussed continued investment in artificial intelligence infrastructure, advertising tools, and long-term product development. Replace this demo content with the downloaded dataset before evaluating the RAG experience."
+  },
+  {
+    "ticker": "META",
+    "date": "2025-01-29",
+    "quarter": "Q4",
+    "year": 2024,
+    "title": "Meta Q4 2024 demo transcript",
+    "transcript": "This fictional preview call discusses investment priorities, infrastructure capacity, and advertising performance. The text exists solely to test source metadata, transcript display, and the upcoming chunking pipeline. It is not a quotation from Meta management."
+  },
+  {
+    "ticker": "META",
+    "date": "2024-10-30",
+    "quarter": "Q3",
+    "year": 2024,
+    "title": "Meta Q3 2024 demo transcript",
+    "transcript": "In this fictional preview passage, management describes operating discipline alongside product investment. A production FinSight corpus will preserve real call date, fiscal quarter, transcript text, and source attribution for every retrieved answer."
+  }
+]
