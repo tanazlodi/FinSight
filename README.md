@@ -28,3 +28,15 @@ vector-index steps. For text files, it uses the filename/path to infer the
 quarter and year when those values are included there.
 
 Read [docs/data_sources.md](docs/data_sources.md) before adding data.
+
+## Build retrieval chunks
+
+After adding the raw text corpus, run:
+
+```bash
+python scripts/build_chunks.py
+```
+
+This writes `data/processed/transcript_chunks.jsonl`: one source-citable,
+overlapping text passage per line. This local artifact is ignored by Git and
+will be the input to the embedding and vector-search stage.
