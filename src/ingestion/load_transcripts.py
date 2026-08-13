@@ -17,7 +17,8 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_PATH = PROJECT_ROOT / "data" / "sample" / "meta_demo_transcripts.json"
-RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw" / "meta_transcripts"
+# This is the name of the folder included in the downloaded Kaggle corpus.
+RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw" / "META_EarningsCallTranscripts"
 
 REQUIRED_COLUMNS = ["ticker", "date", "quarter", "year", "transcript"]
 COLUMN_ALIASES = {
@@ -47,14 +48,30 @@ def _read_file(path: Path) -> pd.DataFrame:
             flags=re.IGNORECASE,
         )
         quarter_number = next((group for group in quarter_match.groups() if group), None) if quarter_match else None
+        transcript = path.read_text(encoding="utf-8", errors="replace")
+
+        # Most calls print a date near the top, e.g. "April 30th, 2025".
+        # Keeping it with the transcript gives the dashboard a truthful call date
+        # and allows the normalized table to sort chronologically.
+        date_match = re.search(
+            r"\b(January|February|March|April|May|June|July|August|September|October|November|December)"
+            r"\s+\d{1,2}(?:st|nd|rd|th)?[,]?\s+(?:19|20)\d{2}\b",
+            transcript[:5_000],
+            flags=re.IGNORECASE,
+        )
+        call_date = None
+        if date_match:
+            clean_date = re.sub(r"(\d{1,2})(st|nd|rd|th)", r"\1", date_match.group(), flags=re.IGNORECASE)
+            call_date = pd.to_datetime(clean_date, errors="coerce")
 
         return pd.DataFrame(
             [{
                 "ticker": "META",
+                "date": call_date,
                 "year": int(year_match.group()) if year_match else None,
                 "quarter": f"Q{quarter_number}" if quarter_number else "Unknown",
                 "title": filename,
-                "transcript": path.read_text(encoding="utf-8", errors="replace"),
+                "transcript": transcript,
             }]
         )
 

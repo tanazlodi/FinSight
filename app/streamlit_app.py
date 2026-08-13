@@ -154,11 +154,11 @@ def main() -> None:
     if calls.empty:
         st.warning(
             "No transcripts are loaded yet. Add the downloaded dataset under "
-            "`data/raw/meta_transcripts/` and restart the app."
+            "`data/raw/META_EarningsCallTranscripts/` and restart the app."
         )
     else:
         is_demo = os.getenv("USE_SAMPLE_DATA", "true").lower() == "true" and not (
-            PROJECT_ROOT / "data" / "raw" / "meta_transcripts"
+            PROJECT_ROOT / "data" / "raw" / "META_EarningsCallTranscripts"
         ).exists()
         if is_demo:
             st.info(

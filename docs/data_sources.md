@@ -10,7 +10,7 @@ actual company transcript.
 
 For the portfolio build, use the Kaggle **META Earnings Call Transcripts**
 dataset. Download it manually, retain its attribution and license information,
-and place its files in `data/raw/meta_transcripts/`. The raw data is ignored by
+and place its files in `data/raw/META_EarningsCallTranscripts/`. The raw data is ignored by
 Git so it is not redistributed by this repository.
 
 ## Price data

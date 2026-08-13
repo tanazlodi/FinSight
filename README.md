@@ -18,7 +18,7 @@ is downloaded.
 ## Add the intended transcript dataset
 
 1. Download the META Earnings Call Transcripts dataset from Kaggle.
-2. Unzip it inside `data/raw/meta_transcripts/`.
+2. Unzip it inside `data/raw/META_EarningsCallTranscripts/`.
 3. Restart Streamlit.
 
 The loader accepts individual `.txt` files as well as CSV, JSON, JSONL, and
