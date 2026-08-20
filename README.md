@@ -40,3 +40,17 @@ python scripts/build_chunks.py
 This writes `data/processed/transcript_chunks.jsonl`: one source-citable,
 overlapping text passage per line. This local artifact is ignored by Git and
 will be the input to the embedding and vector-search stage.
+
+## Build the local vector index
+
+Configure an AWS profile with permission to invoke Amazon Bedrock, then install
+the remaining packages and build the index:
+
+```bash
+python -m pip install -r requirements.txt
+python scripts/build_vector_index.py
+```
+
+The script sends each chunk to Amazon Bedrock Titan Text Embeddings V2 and
+writes a local FAISS index plus matching citation metadata under
+`data/processed/faiss_index/`. The local index is ignored by Git.
