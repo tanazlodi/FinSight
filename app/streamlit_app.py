@@ -14,6 +14,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.ingestion.load_transcripts import load_transcript_calls
+from src.rag.embeddings import BedrockEmbedder
+from src.rag.vector_store import FaissVectorStore
 
 load_dotenv()
 
@@ -26,6 +28,10 @@ st.set_page_config(
 TICKERS = os.getenv("DEFAULT_TICKERS", "META").split(",")
 TICKERS = [ticker.strip().upper() for ticker in TICKERS]
 RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.04"))
+TOP_K_RESULTS = int(os.getenv("TOP_K_RESULTS", "5"))
+FAISS_INDEX_PATH = PROJECT_ROOT / os.getenv(
+    "FAISS_INDEX_PATH", "data/processed/faiss_index"
+)
 
 
 @st.cache_data(ttl=3600)
@@ -112,6 +118,34 @@ def load_calls() -> pd.DataFrame:
     return load_transcript_calls(use_sample_data=use_sample_data)
 
 
+@st.cache_resource
+def load_vector_store() -> FaissVectorStore:
+    """Load the saved local index once per Streamlit server session."""
+    return FaissVectorStore.load(FAISS_INDEX_PATH)
+
+
+@st.cache_resource
+def load_embedder() -> BedrockEmbedder:
+    """Create one Bedrock client for embedding submitted questions."""
+    return BedrockEmbedder()
+
+
+def display_retrieval_results(results: list[dict[str, object]]) -> None:
+    """Render retrieved evidence with enough metadata for source verification."""
+    for rank, result in enumerate(results, start=1):
+        date = result.get("date")
+        call_date = pd.to_datetime(date).strftime("%b %d, %Y") if date else "Unknown date"
+        citation = (
+            f"{result.get('ticker', 'Unknown')} · {result.get('quarter', 'Unknown')} "
+            f"{result.get('year', '')} · {call_date}"
+        )
+        score = float(result["similarity_score"])
+
+        with st.expander(f"{rank}. {citation} — relevance {score:.0%}", expanded=rank == 1):
+            st.caption(f"Source: {result.get('title', 'Earnings call')} · {result.get('chunk_id')}")
+            st.write(str(result["text"]))
+
+
 def main() -> None:
     st.title("FinSight")
     st.caption("AI-powered equity research from earnings-call transcripts and market data.")
@@ -120,7 +154,7 @@ def main() -> None:
         st.header("Research settings")
         ticker = st.selectbox("Select a company", TICKERS)
         st.divider()
-        st.caption("Transcript search and cited AI answers are coming next.")
+        st.caption("Search retrieves source passages from the local FAISS index.")
 
     with st.spinner(f"Loading {ticker} market data..."):
         prices = load_price_data(ticker)
@@ -180,12 +214,42 @@ def main() -> None:
             disabled=True,
         )
 
-    st.subheader("What FinSight will answer")
-    st.info(
-            'Next milestone: “What did management say about margin pressure this quarter?” '
-            "FinSight will retrieve relevant transcript passages and show the sources "
-            "behind its answer."
-    )
+    st.subheader("Ask the earnings-call corpus")
+    st.caption("Searches the embedded transcript passages by meaning and returns the source evidence.")
+
+    if not FAISS_INDEX_PATH.exists():
+        st.warning(
+            "The local vector index is missing. Run `python scripts/build_vector_index.py` "
+            "before using transcript search."
+        )
+    else:
+        with st.form("retrieval_form"):
+            question = st.text_input(
+                "Ask a question about management commentary",
+                placeholder="What did management say about AI infrastructure investment?",
+            )
+            submitted = st.form_submit_button("Find supporting passages")
+
+        if submitted:
+            if not question.strip():
+                st.warning("Enter a question before searching the transcript corpus.")
+            else:
+                try:
+                    with st.spinner("Embedding your question and searching transcript evidence..."):
+                        question_vector = load_embedder().embed(question)
+                        retrieved = load_vector_store().search(question_vector, top_k=TOP_K_RESULTS)
+                        results = [result for result in retrieved if result.get("ticker") == ticker]
+                    if results:
+                        st.success(f"Found {len(results)} relevant transcript passages.")
+                        display_retrieval_results(results)
+                    else:
+                        st.info(f"No indexed passages were found for {ticker}.")
+                except Exception as error:
+                    st.error(
+                        "FinSight could not search the corpus. Confirm that your AWS profile "
+                        "is configured and has Bedrock access, then try again."
+                    )
+                    st.exception(error)
 
     with st.expander("About these metrics"):
         st.write(
