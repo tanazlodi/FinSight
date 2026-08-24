@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.ingestion.load_transcripts import load_transcript_calls
 from src.rag.embeddings import BedrockEmbedder
+from src.rag.generate import GroundedAnswerGenerator
 from src.rag.vector_store import FaissVectorStore
 
 load_dotenv()
@@ -130,6 +131,12 @@ def load_embedder() -> BedrockEmbedder:
     return BedrockEmbedder()
 
 
+@st.cache_resource
+def load_answer_generator() -> GroundedAnswerGenerator:
+    """Create one Bedrock Nova client for grounded answer generation."""
+    return GroundedAnswerGenerator()
+
+
 def display_retrieval_results(results: list[dict[str, object]]) -> None:
     """Render retrieved evidence with enough metadata for source verification."""
     for rank, result in enumerate(results, start=1):
@@ -215,7 +222,7 @@ def main() -> None:
         )
 
     st.subheader("Ask the earnings-call corpus")
-    st.caption("Searches the embedded transcript passages by meaning and returns the source evidence.")
+    st.caption("Retrieves supporting passages, then generates an answer grounded only in that evidence.")
 
     if not FAISS_INDEX_PATH.exists():
         st.warning(
@@ -228,26 +235,31 @@ def main() -> None:
                 "Ask a question about management commentary",
                 placeholder="What did management say about AI infrastructure investment?",
             )
-            submitted = st.form_submit_button("Find supporting passages")
+            submitted = st.form_submit_button("Research question")
 
         if submitted:
             if not question.strip():
                 st.warning("Enter a question before searching the transcript corpus.")
             else:
                 try:
-                    with st.spinner("Embedding your question and searching transcript evidence..."):
+                    with st.spinner("Retrieving transcript evidence and drafting a grounded answer..."):
                         question_vector = load_embedder().embed(question)
                         retrieved = load_vector_store().search(question_vector, top_k=TOP_K_RESULTS)
                         results = [result for result in retrieved if result.get("ticker") == ticker]
                     if results:
-                        st.success(f"Found {len(results)} relevant transcript passages.")
+                        with st.spinner("Generating a source-cited answer..."):
+                            answer = load_answer_generator().answer(question, results)
+                        st.markdown("#### FinSight answer")
+                        st.write(answer)
+                        st.caption("Answer generation is constrained to the retrieved passages below.")
+                        st.markdown("#### Retrieved source passages")
                         display_retrieval_results(results)
                     else:
                         st.info(f"No indexed passages were found for {ticker}.")
                 except Exception as error:
                     st.error(
-                        "FinSight could not search the corpus. Confirm that your AWS profile "
-                        "is configured and has Bedrock access, then try again."
+                        "FinSight could not complete this request. Confirm that your AWS profile "
+                        "has access to Titan Embeddings and Nova Lite, then try again."
                     )
                     st.exception(error)
 

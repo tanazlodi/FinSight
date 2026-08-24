@@ -54,3 +54,11 @@ python scripts/build_vector_index.py
 The script sends each chunk to Amazon Bedrock Titan Text Embeddings V2 and
 writes a local FAISS index plus matching citation metadata under
 `data/processed/faiss_index/`. The local index is ignored by Git.
+
+## Ask source-cited research questions
+
+Set `BEDROCK_CHAT_MODEL_ID=amazon.nova-lite-v1:0` in your local `.env`, then
+run the Streamlit app. FinSight embeds the submitted question, retrieves the
+closest transcript passages from FAISS, and asks Amazon Nova Lite to answer
+using only those passages. Generated claims use source labels such as `[S1]`;
+the matching source excerpts remain visible immediately below the answer.
