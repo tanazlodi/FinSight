@@ -62,3 +62,17 @@ run the Streamlit app. FinSight embeds the submitted question, retrieves the
 closest transcript passages from FAISS, and asks Amazon Nova Lite to answer
 using only those passages. Generated claims use source labels such as `[S1]`;
 the matching source excerpts remain visible immediately below the answer.
+
+## Build quarterly management-tone scores
+
+Install the local ML dependencies, then run the FinBERT scoring pipeline:
+
+```bash
+python -m pip install -r requirements.txt
+python scripts/build_sentiment_scores.py
+```
+
+This downloads the `ProsusAI/finbert` model on first run and writes
+`data/processed/quarterly_sentiment.csv`. The Streamlit dashboard charts the
+precomputed score as average positive probability minus average negative
+probability across each call's prepared remarks.

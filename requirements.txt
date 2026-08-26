@@ -6,3 +6,5 @@ yfinance
 python-dotenv
 boto3
 faiss-cpu
+transformers
+torch

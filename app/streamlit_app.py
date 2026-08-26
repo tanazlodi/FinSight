@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.ingestion.load_transcripts import load_transcript_calls
+from src.analytics.sentiment import sentiment_chart
 from src.rag.embeddings import BedrockEmbedder
 from src.rag.generate import GroundedAnswerGenerator
 from src.rag.vector_store import FaissVectorStore
@@ -33,6 +34,7 @@ TOP_K_RESULTS = int(os.getenv("TOP_K_RESULTS", "5"))
 FAISS_INDEX_PATH = PROJECT_ROOT / os.getenv(
     "FAISS_INDEX_PATH", "data/processed/faiss_index"
 )
+SENTIMENT_PATH = PROJECT_ROOT / "data" / "processed" / "quarterly_sentiment.csv"
 
 
 @st.cache_data(ttl=3600)
@@ -119,6 +121,12 @@ def load_calls() -> pd.DataFrame:
     return load_transcript_calls(use_sample_data=use_sample_data)
 
 
+@st.cache_data
+def load_sentiment_scores() -> pd.DataFrame:
+    """Load precomputed FinBERT tone scores without loading the ML model in the app."""
+    return pd.read_csv(SENTIMENT_PATH, parse_dates=["date"])
+
+
 @st.cache_resource
 def load_vector_store() -> FaissVectorStore:
     """Load the saved local index once per Streamlit server session."""
@@ -187,6 +195,20 @@ def main() -> None:
     sharpe_col.metric("Sharpe ratio", f"{metrics['sharpe_ratio']:.2f}")
 
     st.plotly_chart(price_chart(prices, ticker), use_container_width=True)
+
+    st.subheader("Management tone trend")
+    if SENTIMENT_PATH.exists():
+        sentiment_scores = load_sentiment_scores()
+        st.plotly_chart(sentiment_chart(sentiment_scores, ticker), use_container_width=True)
+        st.caption(
+            "Net tone is the average FinBERT positive probability minus negative probability "
+            "across prepared-remarks text. It is a language signal, not an investment rating."
+        )
+    else:
+        st.info(
+            "Quarterly tone scores have not been built yet. Run "
+            "`python scripts/build_sentiment_scores.py` to create them."
+        )
 
     st.subheader("Earnings-call corpus")
     calls = load_calls()
@@ -268,6 +290,13 @@ def main() -> None:
             "Annualized return and volatility are calculated from the last two years "
             "of daily adjusted closing prices. The Sharpe ratio uses the risk-free "
             f"rate in your `.env` file ({RISK_FREE_RATE:.1%})."
+        )
+
+    with st.expander("About management tone"):
+        st.write(
+            "FinSight scores the prepared-remarks portion of each earnings call with FinBERT, "
+            "then averages the model's positive, negative, and neutral probabilities. The chart's "
+            "net-tone score is positive probability minus negative probability."
         )
 
     st.caption(
