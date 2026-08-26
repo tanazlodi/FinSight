@@ -156,7 +156,7 @@ def display_retrieval_results(results: list[dict[str, object]]) -> None:
         )
         score = float(result["similarity_score"])
 
-        with st.expander(f"{rank}. {citation} — relevance {score:.0%}", expanded=rank == 1):
+        with st.expander(f"[S{rank}] {citation} — relevance {score:.0%}", expanded=rank == 1):
             st.caption(f"Source: {result.get('title', 'Earnings call')} · {result.get('chunk_id')}")
             st.write(str(result["text"]))
 
@@ -255,7 +255,7 @@ def main() -> None:
         with st.form("retrieval_form"):
             question = st.text_input(
                 "Ask a question about management commentary",
-                placeholder="What did management say about AI infrastructure investment?",
+                #placeholder="What did management say about AI infrastructure investment?",
             )
             submitted = st.form_submit_button("Research question")
 
