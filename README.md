@@ -111,6 +111,20 @@ data/processed/quarterly_sentiment.csv
 
 The first FinBERT run downloads the model locally. The first vector-index run makes one Bedrock embedding request per transcript chunk.
 
+### Optional: store deployment artifacts in private S3
+
+After creating a private S3 bucket and granting the configured AWS identity
+`s3:GetObject`, `s3:PutObject`, and `s3:ListBucket` access to it, set
+`S3_BUCKET_NAME` in `.env` and upload the generated artifacts:
+
+```bash
+python scripts/upload_artifacts_to_s3.py
+```
+
+The script uploads the FAISS index, citation metadata, and FinBERT sentiment
+CSV. On a hosted deployment, FinSight downloads missing artifacts from this
+private bucket at startup; the bucket should never be public.
+
 ### 5. Run the dashboard
 
 ```bash

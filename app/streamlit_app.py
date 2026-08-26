@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.ingestion.load_transcripts import load_transcript_calls
 from src.analytics.sentiment import sentiment_chart
+from src.aws.s3 import download_artifacts
 from src.rag.embeddings import BedrockEmbedder
 from src.rag.generate import GroundedAnswerGenerator
 from src.rag.vector_store import FaissVectorStore
@@ -56,6 +57,17 @@ def load_price_data(ticker: str) -> pd.DataFrame:
         prices.columns = prices.columns.get_level_values(0)
 
     return prices.dropna()
+
+
+def ensure_deployment_artifacts() -> None:
+    """Fetch generated artifacts from private S3 when a hosted runtime lacks them."""
+    required_files = [
+        FAISS_INDEX_PATH / "transcript_chunks.faiss",
+        FAISS_INDEX_PATH / "transcript_chunks.metadata.jsonl",
+        SENTIMENT_PATH,
+    ]
+    if not all(path.exists() for path in required_files):
+        download_artifacts(PROJECT_ROOT / "data" / "processed")
 
 
 def calculate_risk_metrics(prices: pd.DataFrame) -> dict[str, float]:
@@ -124,12 +136,14 @@ def load_calls() -> pd.DataFrame:
 @st.cache_data
 def load_sentiment_scores() -> pd.DataFrame:
     """Load precomputed FinBERT tone scores without loading the ML model in the app."""
+    ensure_deployment_artifacts()
     return pd.read_csv(SENTIMENT_PATH, parse_dates=["date"])
 
 
 @st.cache_resource
 def load_vector_store() -> FaissVectorStore:
     """Load the saved local index once per Streamlit server session."""
+    ensure_deployment_artifacts()
     return FaissVectorStore.load(FAISS_INDEX_PATH)
 
 
@@ -197,17 +211,17 @@ def main() -> None:
     st.plotly_chart(price_chart(prices, ticker), use_container_width=True)
 
     st.subheader("Management tone trend")
-    if SENTIMENT_PATH.exists():
+    try:
         sentiment_scores = load_sentiment_scores()
         st.plotly_chart(sentiment_chart(sentiment_scores, ticker), use_container_width=True)
         st.caption(
             "Net tone is the average FinBERT positive probability minus negative probability "
             "across prepared-remarks text. It is a language signal, not an investment rating."
         )
-    else:
+    except Exception:
         st.info(
-            "Quarterly tone scores have not been built yet. Run "
-            "`python scripts/build_sentiment_scores.py` to create them."
+            "Quarterly tone scores are unavailable. Build them locally or configure private S3 "
+            "artifact storage for deployment."
         )
 
     st.subheader("Earnings-call corpus")
@@ -246,7 +260,7 @@ def main() -> None:
     st.subheader("Ask the earnings-call corpus")
     st.caption("Retrieves supporting passages, then generates an answer grounded only in that evidence.")
 
-    if not FAISS_INDEX_PATH.exists():
+    if not FAISS_INDEX_PATH.exists() and not os.getenv("S3_BUCKET_NAME"):
         st.warning(
             "The local vector index is missing. Run `python scripts/build_vector_index.py` "
             "before using transcript search."
