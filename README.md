@@ -97,6 +97,7 @@ Raw and processed data are excluded from Git. See [data source notes](docs/data_
 ```bash
 python scripts/build_chunks.py
 python scripts/build_vector_index.py
+python -m pip install -r requirements-analytics.txt
 python scripts/build_sentiment_scores.py
 ```
 
@@ -109,7 +110,7 @@ data/processed/faiss_index/transcript_chunks.metadata.jsonl
 data/processed/quarterly_sentiment.csv
 ```
 
-The first FinBERT run downloads the model locally. The first vector-index run makes one Bedrock embedding request per transcript chunk.
+The first FinBERT run downloads the model locally. The first vector-index run makes one Bedrock embedding request per transcript chunk. The deployed app does not install FinBERT; it reads the precomputed tone CSV from S3 instead.
 
 ### Optional: store deployment artifacts in private S3
 

@@ -1,0 +1,5 @@
+# Local-only dependencies used to run scripts/build_sentiment_scores.py.
+# The deployed app reads precomputed sentiment scores from private S3.
+-r requirements.txt
+transformers
+torch
