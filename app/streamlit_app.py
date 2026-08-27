@@ -15,6 +15,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.ingestion.load_transcripts import load_transcript_calls
 from src.analytics.sentiment import sentiment_chart
+from src.auth.supabase_auth import is_configured as supabase_is_configured
+from src.auth.supabase_auth import sign_in, sign_up
 from src.aws.s3 import download_artifacts
 from src.rag.embeddings import BedrockEmbedder
 from src.rag.generate import GroundedAnswerGenerator
@@ -33,6 +35,7 @@ TICKERS = [ticker.strip().upper() for ticker in TICKERS]
 RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.04"))
 TOP_K_RESULTS = int(os.getenv("TOP_K_RESULTS", "5"))
 MAX_QUESTIONS_PER_SESSION = int(os.getenv("MAX_QUESTIONS_PER_SESSION", "20"))
+AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "false").lower() == "true"
 FAISS_INDEX_PATH = PROJECT_ROOT / os.getenv(
     "FAISS_INDEX_PATH", "data/processed/faiss_index"
 )
@@ -176,7 +179,90 @@ def display_retrieval_results(results: list[dict[str, object]]) -> None:
             st.write(str(result["text"]))
 
 
+def _set_authenticated_user(session: object, user: object) -> None:
+    """Keep only the active user's display information in this browser session."""
+    st.session_state.authenticated_user = {
+        "email": getattr(user, "email", None) or "Signed-in researcher",
+        "user_id": getattr(user, "id", None),
+        "access_token": getattr(session, "access_token", None),
+    }
+
+
+def require_authenticated_user() -> bool:
+    """Show Supabase login/signup UI and block the research dashboard until signed in."""
+    if not AUTH_REQUIRED:
+        return True
+
+    if "authenticated_user" in st.session_state:
+        return True
+
+    st.title("FinSight")
+    st.caption("Sign in to research earnings-call transcripts and market data.")
+
+    if not supabase_is_configured():
+        st.error(
+            "Authentication is enabled, but Supabase credentials are missing. "
+            "Add SUPABASE_URL and SUPABASE_ANON_KEY to your Streamlit secrets."
+        )
+        return False
+
+    login_tab, signup_tab = st.tabs(["Log in", "Create account"])
+
+    with login_tab:
+        with st.form("login_form"):
+            email = st.text_input("Email", key="login_email").strip()
+            password = st.text_input("Password", type="password", key="login_password")
+            login_submitted = st.form_submit_button("Log in", type="primary")
+
+        if login_submitted:
+            if not email or not password:
+                st.warning("Enter both your email address and password.")
+            else:
+                try:
+                    response = sign_in(email, password)
+                    if not response.session or not response.user:
+                        raise RuntimeError("No session was returned for this account.")
+                    _set_authenticated_user(response.session, response.user)
+                    st.rerun()
+                except Exception:
+                    st.error("We could not log you in. Check your email and password, then try again.")
+
+    with signup_tab:
+        with st.form("signup_form"):
+            email = st.text_input("Email", key="signup_email").strip()
+            password = st.text_input("Password", type="password", key="signup_password")
+            confirmation = st.text_input(
+                "Confirm password", type="password", key="signup_password_confirmation"
+            )
+            signup_submitted = st.form_submit_button("Create account", type="primary")
+
+        if signup_submitted:
+            if not email or not password:
+                st.warning("Enter an email address and password.")
+            elif len(password) < 8:
+                st.warning("Use a password with at least 8 characters.")
+            elif password != confirmation:
+                st.warning("The passwords do not match.")
+            else:
+                try:
+                    response = sign_up(email, password)
+                    if response.session and response.user:
+                        _set_authenticated_user(response.session, response.user)
+                        st.rerun()
+                    st.success(
+                        "Account created. Check your email to confirm your address, then log in."
+                    )
+                except Exception:
+                    st.error("We could not create that account. Try a different email address.")
+
+    st.caption("FinSight is for educational and portfolio-demonstration purposes only.")
+    return False
+
+
 def main() -> None:
+    if not require_authenticated_user():
+        st.stop()
+
     if "questions_used" not in st.session_state:
         st.session_state.questions_used = 0
 
@@ -184,6 +270,13 @@ def main() -> None:
     st.caption("AI-powered equity research from earnings-call transcripts and market data.")
 
     with st.sidebar:
+        if AUTH_REQUIRED:
+            user = st.session_state.authenticated_user
+            st.caption(f"Signed in as {user['email']}")
+            if st.button("Log out", use_container_width=True):
+                del st.session_state.authenticated_user
+                st.rerun()
+            st.divider()
         st.header("Research settings")
         ticker = st.selectbox("Select a company", TICKERS)
         st.divider()
@@ -275,7 +368,7 @@ def main() -> None:
         with st.form("retrieval_form"):
             question = st.text_input(
                 "Ask a question about management commentary",
-                placeholder="What did management say about AI infrastructure investment?",
+                #placeholder="What did management say about AI infrastructure investment?",
             )
             submitted = st.form_submit_button(
                 "Research question", disabled=questions_remaining == 0

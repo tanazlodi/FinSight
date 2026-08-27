@@ -6,3 +6,4 @@ yfinance
 python-dotenv
 boto3
 faiss-cpu
+supabase
