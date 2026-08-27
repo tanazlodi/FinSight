@@ -32,6 +32,7 @@ TICKERS = os.getenv("DEFAULT_TICKERS", "META").split(",")
 TICKERS = [ticker.strip().upper() for ticker in TICKERS]
 RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.04"))
 TOP_K_RESULTS = int(os.getenv("TOP_K_RESULTS", "5"))
+MAX_QUESTIONS_PER_SESSION = int(os.getenv("MAX_QUESTIONS_PER_SESSION", "20"))
 FAISS_INDEX_PATH = PROJECT_ROOT / os.getenv(
     "FAISS_INDEX_PATH", "data/processed/faiss_index"
 )
@@ -176,6 +177,9 @@ def display_retrieval_results(results: list[dict[str, object]]) -> None:
 
 
 def main() -> None:
+    if "questions_used" not in st.session_state:
+        st.session_state.questions_used = 0
+
     st.title("FinSight")
     st.caption("AI-powered equity research from earnings-call transcripts and market data.")
 
@@ -259,6 +263,8 @@ def main() -> None:
 
     st.subheader("Ask the earnings-call corpus")
     st.caption("Retrieves supporting passages, then generates an answer grounded only in that evidence.")
+    questions_remaining = max(MAX_QUESTIONS_PER_SESSION - st.session_state.questions_used, 0)
+    st.caption(f"{questions_remaining} research questions remaining in this browser session.")
 
     if not FAISS_INDEX_PATH.exists() and not os.getenv("S3_BUCKET_NAME"):
         st.warning(
@@ -269,9 +275,17 @@ def main() -> None:
         with st.form("retrieval_form"):
             question = st.text_input(
                 "Ask a question about management commentary",
-                #placeholder="What did management say about AI infrastructure investment?",
+                placeholder="What did management say about AI infrastructure investment?",
             )
-            submitted = st.form_submit_button("Research question")
+            submitted = st.form_submit_button(
+                "Research question", disabled=questions_remaining == 0
+            )
+
+        if questions_remaining == 0:
+            st.warning(
+                "This browser session has reached its research-question limit. Refreshing the "
+                "app starts a new session."
+            )
 
         if submitted:
             if not question.strip():
@@ -287,6 +301,7 @@ def main() -> None:
                             answer = load_answer_generator().answer(question, results)
                         st.markdown("#### FinSight answer")
                         st.write(answer)
+                        st.session_state.questions_used += 1
                         st.caption("Answer generation is constrained to the retrieved passages below.")
                         st.markdown("#### Retrieved source passages")
                         display_retrieval_results(results)

@@ -126,6 +126,14 @@ The script uploads the FAISS index, citation metadata, and FinBERT sentiment
 CSV. On a hosted deployment, FinSight downloads missing artifacts from this
 private bucket at startup; the bucket should never be public.
 
+### Demo-use protection
+
+FinSight limits each browser session to 20 completed research questions by
+default. Set `MAX_QUESTIONS_PER_SESSION` in `.env` or deployment secrets to
+adjust the limit. This is a lightweight demo safeguard against unexpected
+Bedrock usage, not a substitute for production authentication or server-side
+rate limiting.
+
 ### 5. Run the dashboard
 
 ```bash
